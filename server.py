@@ -2,7 +2,7 @@ import socket, random
 from threading import Thread
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-clients = []
+clients, names = [], []
 
 ip_address = '127.0.0.1'
 port = 8000
@@ -32,9 +32,9 @@ def get_qna(conn):
   conn.send(qna[0])
   return qna
 
-def clientthread(conn, addr):
+def clientthread(conn, name):
   score = 0
-  conn.send("Welcome to the quiz game!".encode("utf-8"))
+  conn.send("\nWelcome to the quiz game {}!".format(name).encode("utf-8"))
   conn.send("Guess the correct answer out of three options. Good luck!\n\n".encode("utf-8"))
 
   while len(questions) > 0:
@@ -44,9 +44,9 @@ def clientthread(conn, addr):
       if msg:
         if msg == qna[1]:
           score +=1
-          conn.send("Amazing! Your score is {score}. Keep going!\n\n")
+          conn.send("Amazing! Your score is {}. Keep going!\n\n".format(score).encode("utf-8"))
         else:
-          conn.send("Whoops! That wasn't the right answer! Your score is {score}.\n\n")
+          conn.send("Whoops! That wasn't the right answer! Your score is {}.\n\n".format(score).encode("utf-8"))
         remove_qna(qna)
       else:
         if conn in clients: 
@@ -56,8 +56,11 @@ def clientthread(conn, addr):
 
 while True:
   conn, addr = server.accept()
+  conn.send("__USERNAME__".encode("utf-8"))
+  name = conn.recv(2048).decode("utf-8")
   clients.append(conn)
-  print(addr[0] + "connected")
+  
+  print("{} has connected".format(name))
 
-  new_thread = Thread(target=clientthread, args=(conn, addr))
+  new_thread = Thread(target=clientthread, args=(conn, name))
   new_thread.start()

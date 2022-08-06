@@ -1,66 +1,80 @@
-import socket, random
+import socket, sys
 from threading import Thread
 
+'''
+SOCK_DGRAM : used to create UDP Sockets
+SOCK_STREAM: used to create TCP sockets
+
+TCP: Transimission Control Protocol
+  Tries to resend the packets that were lost during transmission. 
+  Adds a sequence number to each packet and reorders them at receiver's end so that the packets do not arrive in wrong order.
+  Execution is slower.
+  Examples: HTTP, HTTPS, SMTP, FTP, etc.
+UDP: User Datagram Protocol 
+  Doesn't resend the packets that were lost.
+  Packets can arrive in any order.
+  Faster in execution.
+  Examples: DNS, DHCP, etc.
+'''
+
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-clients, names = [], []
 
 ip_address = '127.0.0.1'
 port = 8000
+clients = []
+nicknames = []
+
 server.bind((ip_address, port))
 server.listen()
 
-questions = [
-  ["What is Cynophobia the fear of?\n a) Dogs\n b) Crowded Areas\n c) Heights", "a"],
-  ["Where is the headquarters of the IAEA?\n a) Vienna\n b) Argentina\n c) Brazil", "a"],
-  ["What was former President William Taft's pet cow?\n a) Pauline\n b) Bessie\n c) Daisy", "a"],
-  ["The quote \"What, you egg?\" is from which Shakespearean play?\n a) Macbeth\n b) The Tempest\n c) King Lear", "a"],
-  ["What is the boiling point of ethanol?\n a) 87.4℃\n b) 78.4℃\n c) 47.8℃", "b"],
-  ["Which of these is not a color of the Olympic Rings?\n a) Blue\n b) Orange\n c) Black", "b"],
-  ["What was the name of Alexander the Great's horse?\n a) Cassius\n b) Bucephalus\n c) Fabius", "b"],
-  ["Napolean suffered defeat at Waterloo in what year?\n a) 1769\n b) 1815\n c) 1812", "b"],
-  ["When did the Second World War end?\n a) 1939\n b) 1918\n c) 1945", "c"],
-  ["How many points is the letter\"K\" in the game Scrabble?\n a) 2\n b) 8\n c) 5", "c"],
-  ["Which of these people is depicted on the US $100 bill?\n a) FDR\n b) Obama\n c) Benjamin Franklin", "c"]
-]
+print("Server is running...")
 
-def remove_qna(qna):
-  if qna in questions:
-    questions.remove(qna)
-
-def get_qna(conn):
-  qna = random.choice(questions)
-  conn.send(qna[0])
-  return qna
-
-def clientthread(conn, name):
-  score = 0
-  conn.send("\nWelcome to the quiz game {}!".format(name).encode("utf-8"))
-  conn.send("Guess the correct answer out of three options. Good luck!\n\n".encode("utf-8"))
-
-  while len(questions) > 0:
-    qna = get_qna(conn)
+def clientthread(conn, nick):
+  conn.send("Welcome to the chatroom".encode('utf-8'))
+  while True: 
     try:
-      msg = conn.recv(2048).decode("utf-8")
-      if msg:
-        if msg == qna[1]:
-          score +=1
-          conn.send("Amazing! Your score is {}. Keep going!\n\n".format(score).encode("utf-8"))
-        else:
-          conn.send("Whoops! That wasn't the right answer! Your score is {}.\n\n".format(score).encode("utf-8"))
-        remove_qna(qna)
+      message = conn.recv(2048).decode('utf-8')
+      if message:
+        print(message)
+        broadcast(message, conn)
       else:
-        if conn in clients: 
-          clients.remove(conn)
-    except:
+        remove(conn)
+        remove_nick(nick)
+    except KeyboardInterrupt:
       continue
+
+# Connection is the socket that wants to send the message
+def broadcast(msg, conn):
+  for client in clients:
+    if client != conn:
+      try:
+        client.send(msg.encode("utf-8"))
+      except:
+        remove(client)
+
+def remove(connection):
+  if connection in clients:
+    clients.remove(connection)
+
+def remove_nick(nick):
+  if nick in nicknames:
+    nicknames.remove(nick)
+
+def close():
+  server.shutdown(socket.SHUT_RDWR)
+  server.close()
+  sys.exit()
 
 while True:
   conn, addr = server.accept()
-  conn.send("__USERNAME__".encode("utf-8"))
+  conn.send("NICKNAME".encode("utf-8"))
   name = conn.recv(2048).decode("utf-8")
   clients.append(conn)
-  
-  print("{} has connected".format(name))
+  nicknames.append(name)
+
+  msg = "{} has joined the chat".format(name)
+  print(msg)
+  broadcast(msg, conn)
 
   new_thread = Thread(target=clientthread, args=(conn, name))
   new_thread.start()
